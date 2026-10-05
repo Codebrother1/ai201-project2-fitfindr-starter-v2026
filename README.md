@@ -39,7 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
+FitFindr is an agent that helps a user evaluate a thrift listing based on a plain-language request such as "vintage graphic tee under $30." The agent parses the request into a description, optional size, and optional maximum price, then searches the listings data for matching items. If a match is found, it selects the best result, suggests one or two outfits using the user's saved wardrobe, and generates a short fit-card caption for the item. If no listing matches, the agent stops before calling the later tools and tells the user what they can change in the request.
 
 ---
 
@@ -80,24 +80,17 @@
 
 ## Planning Loop
 
-<!-- Your branch rule, stated as a rule — the condition AND both paths — plus
-     the file and function that holds it.
+The planning loop lives in `agent.py` inside `run_agent()`. The agent first parses the user query into `description`, `size`, and `max_price`, then starts with the action `"search"`. After `search_listings()` runs, the loop checks the returned results: if the list is empty, it stores an error message in the session and stops immediately; if results exist, it stores the first result in `session["selected_item"]` and changes the next action to `"outfit"`.
 
-     Like this:
-       "If search_listings returns an empty list, put a message in the session
-        and stop. Otherwise take the first result and go to suggest_outfit."
-        — agent.py::run_agent
+The `"outfit"` step calls `suggest_outfit()` using `session["selected_item"]` and `session["wardrobe"]`, then stores the result in `session["outfit_suggestion"]` and moves to `"fit_card"`. The `"fit_card"` step calls `create_fit_card()` using the stored outfit suggestion and selected item, saves the result in `session["fit_card"]`, and returns the finished session. Each pass through the loop also calls `trace.check_iterations()` so the agent stops if the loop ever exceeds the configured maximum number of iterations.
 
-     The grader checks your code against what you claim here, so the file and
-     function have to be real. -->
-
-**Branch rule:**
+**Branch rule:** If `search_listings()` returns an empty list, store a helpful message in `session["error"]` and stop without calling `suggest_outfit()`. Otherwise, store the first result in `session["selected_item"]` and continue to `suggest_outfit()`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** The query is parsed with Python regular expressions in `run_agent()`. Regex extracts an optional `under $...` maximum price and an optional `size ...`, then removes those phrases from the query to leave the search description.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** The parsed values go into `session["parsed"]`; search results go into `session["search_results"]`; the chosen listing goes into `session["selected_item"]`; `suggest_outfit()` writes its result to `session["outfit_suggestion"]`; and `create_fit_card()` writes the final caption to `session["fit_card"]`. If search returns nothing, the stop message goes into `session["error"]`.
 
 ---
 
@@ -109,52 +102,102 @@
      2. Your three per-tool terminal tests — the command and what it printed. -->
 
 **One full query**
+$ python app.py ask 'vintage graphic tee under $30'
 
-```
-$ python app.py ask '...'
+Found: Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
-```
+Outfit: Here are two outfits using the Y2K butterfly baby tee and pieces from your wardrobe:
 
+### Outfit 1: Y2K Streetwear Contrast
+
+Pair the fitted, feminine baby tee with relaxed denim and chunky footwear for a classic early 2000s street style look.
+
+- **Top:** Y2K Butterfly Baby Tee
+- **Bottoms:** Baggy straight-leg jeans (dark wash)
+- **Outerwear:** Vintage black denim jacket
+- **Shoes:** Chunky white sneakers
+- **Accessories:** Black crossbody bag
+
+### Outfit 2: Casual Earth-Tone Mix
+
+Balance the pink and purple butterfly print with neutral, relaxed trousers for an effortless, everyday look.
+
+- **Top:** Y2K Butterfly Baby Tee
+- **Bottoms:** Wide-leg khaki trousers
+- **Accessories:** Brown leather belt, Black crossbody bag
+- **Shoes:** Chunky white sneakers
+
+Fit card: Obsessed with this Y2K butterfly baby tee I just scored for only $18.00 over on my Depop! It gives off the absolute best early 2000s street style when paired with baggy dark-wash denim and a distressed black jacket. Grab it before I change my mind and keep it for myself! 🦋✨
+
+0 model calls this session, 2 served from cache
 **The three tools, tested one at a time**
 
-```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
 
+[
+{
+'id': 'lst_002',
+'title': 'Y2K Baby Tee — Butterfly Print',
+'price': 18.0,
+'size': 'S/M',
+'platform': 'depop',
+...
+},
+{
+'id': 'lst_006',
+'title': 'Graphic Tee — 2003 Tour Bootleg Style',
+'price': 24.0,
+'size': 'L',
+'platform': 'depop',
+...
+},
+...
+]
+
+```text
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+
+Here are two outfits utilizing the vintage Levi's 501 jeans and pieces from your wardrobe:
+
+### Outfit 1: Clean Streetwear Minimal
+Leans into the classic, effortless streetwear vibe of the 501s.
+
+* **Bottoms:** Vintage Levi's 501 Jeans (Medium Wash)
+* **Top:** White ribbed tank top (tucked in)
+* **Outerwear:** Vintage black denim jacket (worn overtop)
+* **Shoes:** Chunky white sneakers
+* **Accessories:** Black crossbody bag
+
+### Outfit 2: Casual Grunge Contrast
+Plays with proportions by pairing a fitted base with an oversized cozy layer and chunky footwear.
+
+* **Bottoms:** Vintage Levi's 501 Jeans (Medium Wash)
+* **Top:** Oversized grey crewneck sweatshirt
+* **Shoes:** Black combat boots
+* **Accessories:** Brown leather belt (to cinch the waist)
 ```
 
-```
-$ python -c "from tools import suggest_outfit; ..."
+```text
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
 
-```
-
-```
-$ python -c "from tools import create_fit_card; ..."
-
+Nothing beats the fit of broken-in vintage denim, and these medium wash Levi's 501s are the holy grail. Grab this classic pair over on my Depop for just $38 before I change my mind and keep them. Throw them on with a crisp white tee and retro sneakers for that effortlessly cool, off-duty streetwear look.
 ```
 
 ---
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
-
-     "I used Claude to help me code" is not enough.
-
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
-
 **Moment 1**
 
-- _What I asked for:_
-- _What came back:_
-- _What I changed:_
+- _What I asked for:_ I asked for help implementing `search_listings` from the tool specification, including keyword scoring, size filtering, and the maximum-price filter.
+- _What came back:_ The first pasted implementation caused an `IndentationError` because the implementation block was indented one level too far inside `search_listings`.
+- _What I changed:_ I moved the entire implementation block left one indentation level, reran `python -m py_compile tools.py`, and then tested both a matching query and an impossible query to confirm the tool returned listing dictionaries or `[]` as specified.
 
 **Moment 2**
 
-- _What I asked for:_
-- _What came back:_
-- _What I changed:_
-
+- _What I asked for:_ I asked for help wiring the planning loop in `agent.py` so the next action depended on what `search_listings` returned.
+- _What came back:_ The suggested loop used an `action` variable with `"search"`, `"outfit"`, and `"fit_card"` states, stored each result in the session, and stopped early when search returned an empty list.
+- _What I changed:_ I tested the parser and branch separately before running the full loop, then verified that a matching query completed all three tools while an impossible query stopped with `session["fit_card"]` still set to `None`.
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -322,3 +365,15 @@ full. -->
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
