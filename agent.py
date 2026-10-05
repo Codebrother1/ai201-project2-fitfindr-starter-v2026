@@ -12,6 +12,7 @@ Build and test your three tools in `tools.py` first. Then come here.
 
     python agent.py          runs both example paths below
 """
+import re
 
 import config
 import trace
@@ -107,8 +108,97 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    price_match = re.search(
+        r"\bunder\s+\$?(\d+(?:\.\d+)?)",
+        query,
+        re.IGNORECASE,
+    )
+
+    size_match = re.search(
+        r"\bsize\s+([A-Za-z0-9/]+)",
+        query,
+        re.IGNORECASE,
+    )
+
+    max_price = float(price_match.group(1)) if price_match else None
+    size = size_match.group(1) if size_match else None
+
+    description = re.sub(
+        r"\bunder\s+\$?\d+(?:\.\d+)?",
+        "",
+        query,
+        flags=re.IGNORECASE,
+    )
+
+    description = re.sub(
+        r"\b(?:in\s+)?size\s+[A-Za-z0-9/]+",
+        "",
+        description,
+        flags=re.IGNORECASE,
+    )
+
+    description = re.sub(
+        r"^\s*(?:looking\s+for|find\s+me)\s+",
+        "",
+        description,
+        flags=re.IGNORECASE,
+    )
+
+    description = re.sub(r"[,\s]+$", "", description).strip()
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    action = "search"
+    iterations = 0
+
+    while True:
+        iterations += 1
+        trace.check_iterations(iterations)
+
+        if action == "search":
+            results = search_listings(
+                description=description,
+                size=size,
+                max_price=max_price,
+            )
+
+            session["search_results"] = results
+
+            if not results:
+                session["error"] = (
+                    "I couldn't find a matching listing. Try changing the "
+                    "description, using a different size, or raising the "
+                    "maximum price."
+                )
+                return session
+
+            session["selected_item"] = results[0]
+            action = "outfit"
+            continue
+
+        if action == "outfit":
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"],
+                session["wardrobe"],
+            )
+
+            action = "fit_card"
+            continue
+
+        if action == "fit_card":
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"],
+                session["selected_item"],
+            )
+
+            return session
+
+    session["selected_item"] = results[0]
+
     return session
 
 
