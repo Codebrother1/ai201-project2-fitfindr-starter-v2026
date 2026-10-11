@@ -18,6 +18,7 @@ import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+from mcp_client import call_tool
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -160,34 +161,33 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         trace.check_iterations(iterations)
 
         if action == "search":
-            results = search_listings(
-                description=description,
-                size=size,
-                max_price=max_price,
+            results = call_tool(
+                "search_listings",
+                {
+                    "description": description,
+                    "size": size,
+                    "max_price": max_price,
+                },
             )
 
             session["search_results"] = results
 
             if not results:
                 session["error"] = (
-                    "I couldn't find a matching listing. Try changing the "
-                    "description, using a different size, or raising the "
-                    "maximum price."
+                    "I couldn't find a matching listing. Try changing "
+                    "the description, size, or maximum price."
                 )
                 return session
 
             session["selected_item"] = results[0]
             action = "outfit"
-            continue
 
         if action == "outfit":
             session["outfit_suggestion"] = suggest_outfit(
                 session["selected_item"],
                 session["wardrobe"],
             )
-
             action = "fit_card"
-            continue
 
         if action == "fit_card":
             session["fit_card"] = create_fit_card(
@@ -196,10 +196,6 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             )
 
             return session
-
-    session["selected_item"] = results[0]
-
-    return session
 
 
 # ── running it directly ───────────────────────────────────────────────────────
