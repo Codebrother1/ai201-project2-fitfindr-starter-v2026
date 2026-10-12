@@ -222,13 +222,14 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 returned=session["outfit_suggestion"],
             )
 
-            action = "fit_card"
+        action = "fit_card"
 
         if action == "fit_card":
             session["fit_card"] = create_fit_card(
                 session["outfit_suggestion"],
                 session["selected_item"],
             )
+
             trace.step(
                 "create_fit_card",
                 inputs={
@@ -238,7 +239,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 returned=session["fit_card"],
             )
 
-            return session
+        return session
 
 
 # ── running it directly ───────────────────────────────────────────────────────
