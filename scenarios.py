@@ -35,6 +35,24 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
+    {
+    "name": "selected item stays consistent",
+    "query": "vintage graphic tee under $30",
+    "wardrobe": "example",
+    "criterion": 3,
+},
+{
+    "name": "fit card includes listing details",
+    "query": "vintage graphic tee under $30",
+    "wardrobe": "example",
+    "criterion": 4,
+},
+{
+    "name": "search respects maximum price",
+    "query": "vintage graphic tee under $30",
+    "wardrobe": "example",
+    "criterion": 5,
+},
     # TODO: add what your criteria 3, 4 and 5 need.
     #
     # Set "criterion" to the number in criteria.md that the scenario tests.
